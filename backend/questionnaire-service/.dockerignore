@@ -1,0 +1,34 @@
+# Exclure les dossiers de build et de debug
+**/bin/
+**/obj/
+**/out/
+
+# Exclure les fichiers de développement
+**/.vs/
+**/.vscode/
+**/.idea/
+
+# Exclure les fichiers de logs
+**/*.log
+
+# Exclure les fichiers temporaires
+**/*.tmp
+**/*.temp
+
+# Exclure les fichiers de test
+**/TestResults/
+
+# Exclure les fichiers Docker
+**/Dockerfile*
+**/.dockerignore
+
+# Exclure Git
+**/.git/
+**/.gitignore
+
+# Exclure les dépendances npm (si applicable)
+**/node_modules/
+
+# Exclure les fichiers de configuration locale
+**/.env.local
+**/.env.development

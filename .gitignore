@@ -1,0 +1,56 @@
+# .NET Core
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ASP.NET Core
+wwwroot/
+
+# Microsoft Visual Studio for Mac
+.vscode/
+
+# Rider
+.idea/
+
+# NPM packages (if using Node.js in frontend)
+node_modules/
+
+# Environment variables
+.env
+
+# Azure Functions (if using Azure Functions)
+local.settings.json
+
+# MacOS Finder
+.DS_Store
+
+# Windows Installer files
+Thumbs.db
+
+# Log files
+*.log
+
+# JetBrains Rider
+.idea/
+
+# .NET Global Tools directory
+~/.dotnet/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+
+# Ignore all .env files
+*.env
+
+# Ignore other OS-specific files
+.vscode/

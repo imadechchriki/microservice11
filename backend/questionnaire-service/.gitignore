@@ -1,0 +1,57 @@
+# Ignore Visual Studio and VS Code folders
+.vs/
+.vscode/
+.idea/
+
+# Ignore build results
+**/bin/
+**/obj/
+**/out/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Dotnet-specific
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.cache
+*.log
+
+# ASP.NET / Blazor specific
+wwwroot/
+**/wwwroot/
+node_modules/
+
+
+
+# Logs and test results
+*.log
+TestResults/
+coverage/
+
+# NuGet packages
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# Others
+*.db
+*.bak
+*.swp
+*~
+*.tmp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+appsettings.Development.json
+appsettings.Local.json

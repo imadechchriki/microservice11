@@ -1,0 +1,3 @@
+auth-postgres:5432:UserDb:postgres:Imad2002
+catalog-postgres:5432:catalog_db:postgres:Imad2002
+questionnaire-postgres:5432:evaling:postgres:Imad2002

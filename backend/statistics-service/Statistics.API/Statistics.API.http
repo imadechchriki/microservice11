@@ -1,0 +1,54 @@
+@Statistics.API_HostAddress = http://localhost:5246
+
+### Health check (if available)
+GET {{Statistics.API_HostAddress}}/api/statistics/health
+Accept: application/json
+
+### Get all available publications (real data from questionnaire service)
+GET {{Statistics.API_HostAddress}}/api/statistics/publications
+Accept: application/json
+
+### Get overall statistics (NO MOCK DATA - all from questionnaire service)
+GET {{Statistics.API_HostAddress}}/api/statistics/overall
+Accept: application/json
+
+### Get statistics for a specific questionnaire publication (real data)
+GET {{Statistics.API_HostAddress}}/api/statistics/questionnaire/1
+Accept: application/json
+
+### Get statistics for publication 2
+GET {{Statistics.API_HostAddress}}/api/statistics/questionnaire/2
+Accept: application/json
+
+### Get submissions for a specific publication (real data)
+GET {{Statistics.API_HostAddress}}/api/statistics/submissions/1
+Accept: application/json
+
+### Get summary for multiple publications (real data)
+POST {{Statistics.API_HostAddress}}/api/statistics/publications/summary
+Accept: application/json
+Content-Type: application/json
+
+[1, 2, 3, 4, 5, 6]
+
+### Test with invalid publication ID
+GET {{Statistics.API_HostAddress}}/api/statistics/questionnaire/999
+Accept: application/json
+
+### Download scoring guide PDF
+GET {{Statistics.API_HostAddress}}/api/export/scoring-guide
+Accept: application/pdf
+
+### Export overall statistics as PDF
+GET {{Statistics.API_HostAddress}}/api/export/overall/pdf
+Accept: application/pdf
+
+### Export questionnaire statistics as PDF
+GET {{Statistics.API_HostAddress}}/api/export/questionnaire/1/pdf
+Accept: application/pdf
+
+### Get available export formats
+GET {{Statistics.API_HostAddress}}/api/export/formats
+Accept: application/json
+
+###

@@ -1,0 +1,96 @@
+/* Ce fichier peut être intégré dans votre fichier CSS principal, par exemple ProfileCompletion.css */
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Classes d'animation */
+.animate-slide-in {
+  animation: slideIn 0.5s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Transitions */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.transition-colors {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Transformations */
+.transform {
+  transform-origin: center;
+}
+
+.translate-y-4 {
+  transform: translateY(16px);
+}
+
+/* État initial de certains éléments */
+.welcome-container {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+/* Animation au survol pour certains éléments */
+.hover\:bg-purple-500:hover {
+  background-color: #8B5CF6;
+}
+
+.hover\:bg-purple-50:hover {
+  background-color: #F5F3FF;
+}
+
+.hover\:bg-purple-200:hover {
+  background-color: #DDD6FE;
+}

@@ -1,0 +1,73 @@
+# Ignore build results
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# Ignore NuGet packages
+*.nupkg
+packages/
+*.snupkg
+
+# Ignore user-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.vs/
+
+# Ignore Rider IDE files
+.idea/
+*.sln.iml
+
+# Ignore VS Code files
+.vscode/
+
+# Ignore temporary files
+*.tmp
+*.bak
+*.swp
+*.~*
+*.orig
+
+# Ignore compiled DLLs / EXEs
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.cache
+
+# Ignore coverage reports
+coverage/
+*.coverage
+*.coveragexml
+
+# Ignore test results
+TestResults/
+
+# Ignore config secrets
+appsettings.*.json
+*.env
+
+# Ignore ASP.NET Core environment files
+.env.*
+
+# Ignore publish output
+publish/
+out/
+
+# Ignore macOS / Linux files
+.DS_Store
+*.swp
+*.swo
+
+# Ignore Windows thumbs and hidden files
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Ignore JetBrains Rider project files
+.idea/
+*.sln.iml

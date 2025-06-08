@@ -1,0 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+h1 {
+    font-family: "Sofia", sans-serif;
+  }
+.body-login{
+    font-family: Playfair Display;
+    background-image: url('../images/Login/bg1.png'); 
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;  
+
+}  
+

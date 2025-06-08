@@ -1,0 +1,61 @@
+{
+    "Servers": {
+      "1": {
+        "Name": "Auth Database",
+        "Group": "Microservices",
+        "Host": "auth-postgres",
+        "Port": 5432,
+        "MaintenanceDB": "UserDb",
+        "Username": "postgres",
+        "PassFile": "/pgadmin4/pgpass",
+        "SSLMode": "prefer",
+        "SSLCert": "<STORAGE_DIR>/.postgresql/postgresql.crt",
+        "SSLKey": "<STORAGE_DIR>/.postgresql/postgresql.key",
+        "SSLCompression": 0,
+        "Timeout": 10,
+        "UseSSHTunnel": 0,
+        "TunnelHost": "",
+        "TunnelPort": "22",
+        "TunnelUsername": "",
+        "TunnelAuthentication": 0
+      },
+      "2": {
+        "Name": "Catalog Database",
+        "Group": "Microservices",
+        "Host": "catalog-postgres",
+        "Port": 5432,
+        "MaintenanceDB": "catalog_db",
+        "Username": "postgres",
+        "PassFile": "/pgadmin4/pgpass",
+        "SSLMode": "prefer",
+        "SSLCert": "<STORAGE_DIR>/.postgresql/postgresql.crt",
+        "SSLKey": "<STORAGE_DIR>/.postgresql/postgresql.key",
+        "SSLCompression": 0,
+        "Timeout": 10,
+        "UseSSHTunnel": 0,
+        "TunnelHost": "",
+        "TunnelPort": "22",
+        "TunnelUsername": "",
+        "TunnelAuthentication": 0
+      },
+      "3": {
+        "Name": "Questionnaire Database",
+        "Group": "Microservices",
+        "Host": "questionnaire-postgres",
+        "Port": 5432,
+        "MaintenanceDB": "evaling",
+        "Username": "postgres",
+        "PassFile": "/pgadmin4/pgpass",
+        "SSLMode": "prefer",
+        "SSLCert": "<STORAGE_DIR>/.postgresql/postgresql.crt",
+        "SSLKey": "<STORAGE_DIR>/.postgresql/postgresql.key",
+        "SSLCompression": 0,
+        "Timeout": 10,
+        "UseSSHTunnel": 0,
+        "TunnelHost": "",
+        "TunnelPort": "22",
+        "TunnelUsername": "",
+        "TunnelAuthentication": 0
+      }
+    }
+  }
