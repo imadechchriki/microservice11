@@ -13,12 +13,11 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     networks:
       - microservices-network
-    # Health check simplifié pour éviter les blocages
     healthcheck:
       test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 30s
 
   kafka:
@@ -26,7 +25,8 @@ services:
     hostname: kafka
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
@@ -40,13 +40,12 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     networks:
       - microservices-network
-    # Health check simplifié
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "9092"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 15s
+      timeout: 10s
       retries: 5
-      start_period: 45s
+      start_period: 60s
 
   # Base de données PostgreSQL pour auth-service
   auth-postgres:
@@ -65,10 +64,10 @@ services:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d UserDb"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 30s
 
   # Base de données PostgreSQL pour catalog-service
@@ -88,10 +87,10 @@ services:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d catalog_db"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 30s
 
   # Base de données PostgreSQL pour questionnaire-service
@@ -111,10 +110,10 @@ services:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d evaling"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 30s
 
   # pgAdmin - Database Management Interface
@@ -133,16 +132,17 @@ services:
     networks:
       - microservices-network
     depends_on:
-      - auth-postgres
-      - catalog-postgres
-      - questionnaire-postgres
+      auth-postgres:
+        condition: service_healthy
+      catalog-postgres:
+        condition: service_healthy
+      questionnaire-postgres:
+        condition: service_healthy
     restart: unless-stopped
 
-  # Authentication service - Démarrage sans dépendances strictes d'abord
+  # Authentication service
   auth-service:
-    build:
-      context: ./backend/authentication_system/authentication_system
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_OWNER}/${IMAGE_PREFIX}:auth-service-${IMAGE_TAG:-latest}
     container_name: authentication-service
     ports:
       - "5001:8080"
@@ -165,25 +165,23 @@ services:
       - SMTP_USERNAME=imade17ma@gmail.com
       - SMTP_PASSWORD=fsrpmqhytbeoacnc
     depends_on:
-      - auth-postgres
+      auth-postgres:
+        condition: service_healthy
     volumes:
       - ./uploads:/app/wwwroot/uploads/profiles
     networks:
       - microservices-network
     restart: unless-stopped
-    # Health check basique sans curl (peut ne pas être disponible)
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
 
   # Catalog service
   catalog-service:
-    build:
-      context: ./backend/catalog-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_OWNER}/${IMAGE_PREFIX}:catalog-service-${IMAGE_TAG:-latest}
     container_name: catalog-service
     ports:
       - "5003:8080"
@@ -195,22 +193,21 @@ services:
       - Jwt__Issuer=auth-service
       - Jwt__Audience=formation-evaluation-app
     depends_on:
-      - catalog-postgres
+      catalog-postgres:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
 
   # Service de questionnaire (Evaluation Service)
   questionnaire-service:
-    build:
-      context: ./backend/questionnaire-service
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_OWNER}/${IMAGE_PREFIX}:questionnaire-service-${IMAGE_TAG:-latest}
     container_name: questionnaire-service
     ports:
       - "5004:8080"
@@ -222,22 +219,21 @@ services:
       - JWT_ISSUER=auth-service
       - JWT_AUDIENCE=formation-evaluation-app
     depends_on:
-      - questionnaire-postgres
+      questionnaire-postgres:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
 
   # Statistics service
   statistics-service:
-    build:
-      context: ./backend/statistics-service/Statistics.API
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_OWNER}/${IMAGE_PREFIX}:statistics-service-${IMAGE_TAG:-latest}
     container_name: statistics-service
     ports:
       - "5005:8080"
@@ -248,24 +244,25 @@ services:
       - AUTH_SERVICE_URL=http://auth-service:8080
       - CATALOG_SERVICE_URL=http://catalog-service:8080
     depends_on:
-      - auth-service
-      - catalog-service
-      - questionnaire-service
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      questionnaire-service:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 120s
 
-  # API Gateway - Démarrage simplifié
+  # API Gateway
   api-gateway:
-    build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+    image: ${REGISTRY}/${IMAGE_OWNER}/${IMAGE_PREFIX}:api-gateway-${IMAGE_TAG:-latest}
     container_name: api-gateway
     ports:
       - "5000:80"
@@ -278,20 +275,25 @@ services:
       - QUESTIONNAIRE_SERVICE_URL=http://questionnaire-service:8080
       - STATISTICS_SERVICE_URL=http://statistics-service:8080
     depends_on:
-      - kafka
-      - auth-service
-      - catalog-service
-      - questionnaire-service
-      - statistics-service
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      questionnaire-service:
+        condition: service_healthy
+      statistics-service:
+        condition: service_healthy
     networks:
       - microservices-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health", "||", "exit", "1"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 90s
+      retries: 5
+      start_period: 150s
 
 # Configuration du réseau partagé entre microservices
 networks:
