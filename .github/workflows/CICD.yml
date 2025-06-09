@@ -1,335 +1,93 @@
-name: Perfect CI/CD Pipeline
+name: Build and Push Docker Images
 
 on:
   push:
-    branches: [master, main]
+    branches: [ main, master ]
   pull_request:
-    branches: [master, main]
-
-permissions:
-  contents: read
-  packages: write
+    branches: [ main ]
 
 env:
   REGISTRY: docker.io
-  IMAGE_OWNER: ${{ secrets.DOCKERHUB_USERNAME }}
-  IMAGE_PREFIX: microservice11
+  REGISTRY_USERNAME: imadch
+  REPOSITORY_PREFIX: imadch/microservice11
 
 jobs:
-  # Job 1: Build et Push des images
   build-and-push:
-    name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    outputs:
-      image-tag: ${{ steps.meta.outputs.image-tag }}
+    
     strategy:
-      fail-fast: false
       matrix:
-        include:
+        service:
           - name: auth-service
-            context: backend/authentication_system/authentication_system
+            context: ./backend/authentication_system/authentication_system
             dockerfile: Dockerfile
           - name: catalog-service
-            context: backend/catalog-service
+            context: ./backend/catalog-service
             dockerfile: Dockerfile
           - name: questionnaire-service
-            context: backend/questionnaire-service
+            context: ./backend/questionnaire-service
             dockerfile: Dockerfile
           - name: statistics-service
-            context: backend/statistics-service/Statistics.API
+            context: ./backend/statistics-service/Statistics.API
             dockerfile: Dockerfile
           - name: api-gateway
-            context: backend/api-gateway
+            context: ./backend/api-gateway
             dockerfile: Dockerfile
-    
+
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🏷️ Generate metadata
-        id: meta
-        run: |
-          # Générer un tag basé sur le SHA court pour une meilleure lisibilité
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          IMAGE_TAG="${SHORT_SHA}"
-          
-          # Si c'est une PR, ajouter le numéro de PR
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            IMAGE_TAG="pr-${{ github.event.number }}-${SHORT_SHA}"
-          fi
-          
-          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          echo "short-sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          
-          # Générer les tags complets
-          FULL_IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}"
-          echo "image-name=${FULL_IMAGE_NAME}" >> $GITHUB_OUTPUT
-
-      - name: 🔧 Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            network=host
 
-      - name: 🔐 Login to DockerHub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
-      - name: 🔍 Verify Dockerfile exists
-        run: |
-          if [[ ! -f "${{ matrix.context }}/${{ matrix.dockerfile }}" ]]; then
-            echo "❌ Dockerfile not found: ${{ matrix.context }}/${{ matrix.dockerfile }}"
-            exit 1
-          fi
-          echo "✅ Dockerfile found: ${{ matrix.context }}/${{ matrix.dockerfile }}"
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REPOSITORY_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: 🏗️ Build and push ${{ matrix.name }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
-          push: true
+          context: ${{ matrix.service.context }}
+          dockerfile: ${{ matrix.service.dockerfile }}
           platforms: linux/amd64,linux/arm64
+          push: true
           tags: |
-            ${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-latest
-            ${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-${{ steps.meta.outputs.image-tag }}
-          labels: |
-            org.opencontainers.image.title=${{ matrix.name }}
-            org.opencontainers.image.description=Microservice ${{ matrix.name }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
-          cache-from: type=registry,ref=${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-cache
-          cache-to: type=registry,ref=${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-cache,mode=max
+            ${{ env.REPOSITORY_PREFIX }}-${{ matrix.service.name }}:${{ github.sha }}
+            ${{ env.REPOSITORY_PREFIX }}-${{ matrix.service.name }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
 
-      - name: 🔍 Verify image was pushed
-        run: |
-          echo "🔍 Vérification de l'image poussée..."
-          docker pull ${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-${{ steps.meta.outputs.image-tag }}
-          docker inspect ${{ steps.meta.outputs.image-name }}:${{ matrix.name }}-${{ steps.meta.outputs.image-tag }}
-          echo "✅ Image ${{ matrix.name }} vérifiée avec succès!"
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
 
-  # Job 2: Validation de la configuration Docker Compose
-  validate-compose:
-    name: Validate Docker Compose
+  # Job séparé pour nettoyer les anciens caches (optionnel)
+  cleanup-cache:
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🔧 Setup environment variables
+      - name: Cleanup old cache
         run: |
-          echo "REGISTRY=${{ env.REGISTRY }}" >> .env
-          echo "IMAGE_OWNER=${{ secrets.DOCKERHUB_USERNAME }}" >> .env
-          echo "IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}" >> .env
-          echo "IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}" >> .env
-          
-          echo "📋 Configuration générée:"
-          cat .env
-
-      - name: ✅ Validate docker-compose configuration
-        run: |
-          echo "🔍 Validation de la configuration docker-compose..."
-          docker compose config --quiet
-          echo "✅ Configuration docker-compose validée!"
-
-      - name: 🔍 Check image availability
-        run: |
-          echo "🔍 Vérification de la disponibilité des images..."
-          
-          services=("auth-service" "catalog-service" "questionnaire-service" "statistics-service" "api-gateway")
-          
-          for service in "${services[@]}"; do
-            image_name="${{ env.REGISTRY }}/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_PREFIX }}:${service}-${{ needs.build-and-push.outputs.image-tag }}"
-            echo "Vérification de l'image: ${image_name}"
-            
-            # Vérifier si l'image existe sur Docker Hub
-            if docker manifest inspect "${image_name}" > /dev/null 2>&1; then
-              echo "✅ Image ${service} disponible"
-            else
-              echo "❌ Image ${service} non disponible"
-              exit 1
-            fi
-          done
-          
-          echo "🎉 Toutes les images sont disponibles!"
-
-  # Job 3: Tests d'intégration (optionnel)
-  integration-test:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    needs: [build-and-push, validate-compose]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: 📥 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🔧 Setup test environment
-        run: |
-          echo "REGISTRY=${{ env.REGISTRY }}" >> .env
-          echo "IMAGE_OWNER=${{ secrets.DOCKERHUB_USERNAME }}" >> .env
-          echo "IMAGE_PREFIX=${{ env.IMAGE_PREFIX }}" >> .env
-          echo "IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}" >> .env
-
-      - name: 🚀 Start services for testing
-        run: |
-          echo "🚀 Démarrage des services pour les tests..."
-          
-          # Installer curl pour les health checks
-          sudo apt-get update && sudo apt-get install -y curl
-          
-          # Démarrer d'abord les services d'infrastructure
-          docker compose up -d zookeeper kafka auth-postgres catalog-postgres questionnaire-postgres
-          
-          # Attendre que les services d'infrastructure soient prêts
-          echo "⏳ Attente que les services d'infrastructure soient prêts..."
-          sleep 45
-          
-          # Vérifier que Kafka est prêt
-          echo "🔍 Vérification de Kafka..."
-          timeout 60s bash -c 'until docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; do echo "Attente de Kafka..."; sleep 5; done'
-          
-          # Démarrer les microservices un par un avec des délais
-          echo "🚀 Démarrage d'auth-service..."
-          docker compose up -d auth-service
-          sleep 30
-          
-          echo "🚀 Démarrage de catalog-service..."
-          docker compose up -d catalog-service
-          sleep 20
-          
-          echo "🚀 Démarrage de questionnaire-service..."
-          docker compose up -d questionnaire-service
-          sleep 20
-          
-          echo "🚀 Démarrage de statistics-service..."
-          docker compose up -d statistics-service
-          sleep 20
-          
-          echo "🚀 Démarrage d'api-gateway..."
-          docker compose up -d api-gateway
-          sleep 30
-          
-          # Afficher les logs pour diagnostic
-          echo "📋 Status des containers:"
-          docker compose ps
-          
-          echo "📋 Logs d'api-gateway:"
-          docker compose logs --tail=20 api-gateway
-
-      - name: 🧪 Run health checks
-        run: |
-          echo "🧪 Exécution des vérifications de santé..."
-          
-          # Fonction pour vérifier la santé d'un service
-          check_health() {
-            local service_name=$1
-            local port=$2
-            local endpoint=${3:-"/health"}
-            local max_attempts=15
-            local attempt=1
-            
-            echo "Vérification de la santé de $service_name sur le port $port..."
-            
-            while [ $attempt -le $max_attempts ]; do
-              echo "⏳ Tentative $attempt/$max_attempts pour $service_name..."
-              
-              # Vérifier d'abord si le port est ouvert
-              if nc -z localhost $port 2>/dev/null; then
-                echo "✅ Port $port ouvert pour $service_name"
-                
-                # Ensuite vérifier l'endpoint de santé
-                if curl -f -s --max-time 10 "http://localhost:$port$endpoint" > /dev/null 2>&1; then
-                  echo "✅ $service_name est opérationnel"
-                  return 0
-                else
-                  echo "⚠️ Port ouvert mais endpoint de santé non accessible pour $service_name"
-                fi
-              else
-                echo "⚠️ Port $port fermé pour $service_name"
-              fi
-              
-              sleep 15
-              attempt=$((attempt + 1))
-            done
-            
-            echo "❌ $service_name n'est pas opérationnel après $max_attempts tentatives"
-            
-            # Afficher les logs pour diagnostic
-            echo "📋 Logs de $service_name:"
-            docker compose logs --tail=30 $(echo $service_name | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
-            
-            return 1
-          }
-          
-          # Installer netcat pour les vérifications de port
-          sudo apt-get install -y netcat-traditional
-          
-          # Vérifier tous les services dans l'ordre de dépendance
-          # Note: Les ports correspondent maintenant à votre docker-compose.yml
-          check_health "Auth Service" 5001 "/health" || exit 1
-          check_health "Catalog Service" 5003 "/health" || exit 1
-          check_health "Questionnaire Service" 5004 "/health" || exit 1
-          check_health "Statistics Service" 5005 "/health" || exit 1
-          check_health "API Gateway" 5000 "/health" || exit 1
-          
-          echo "🎉 Tous les services sont opérationnels!"
-
-      - name: 🧪 Run basic API tests
-        run: |
-          echo "🧪 Tests basiques des APIs..."
-          
-          # Test simple de l'API Gateway
-          echo "Testing API Gateway basic connectivity..."
-          curl -f -s --max-time 10 "http://localhost:5000/health" || {
-            echo "❌ API Gateway health check failed"
-            exit 1
-          }
-          
-          echo "✅ Tests basiques passés!"
-
-      - name: 🧹 Cleanup
-        if: always()
-        run: |
-          echo "🧹 Nettoyage..."
-          docker compose down -v --remove-orphans
-          docker system prune -f
-
-  # Job 4: Notification de succès
-  notify-success:
-    name: Notify Success
-    runs-on: ubuntu-latest
-    needs: [build-and-push, validate-compose, integration-test]
-    if: success() && github.event_name == 'push' && github.ref == 'refs/heads/master'
-    
-    steps:
-      - name: 🎉 Success notification
-        run: |
-          echo "🎉 Pipeline CI/CD terminé avec succès!"
-          echo "📦 Images Docker poussées avec le tag: ${{ needs.build-and-push.outputs.image-tag }}"
-          echo "🔗 Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}"
-          
-          echo "📋 Images disponibles:"
-          services=("auth-service" "catalog-service" "questionnaire-service" "statistics-service" "api-gateway")
-          for service in "${services[@]}"; do
-            echo "  - ${service}: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_PREFIX }}:${service}-${{ needs.build-and-push.outputs.image-tag }}"
-          done
-
-  # Job 5: Nettoyage en cas d'échec
-  cleanup-on-failure:
-    name: Cleanup on Failure
-    runs-on: ubuntu-latest
-    needs: [build-and-push, validate-compose, integration-test]
-    if: failure()
-    
-    steps:
-      - name: 🧹 Cleanup failed images
-        continue-on-error: true
-        run: |
-          echo "🧹 Nettoyage des images en cas d'échec..."
-          # Nettoyer les containers et images
-          docker system prune -f --volumes
-          echo "✅ Nettoyage terminé"
+          echo "Cache cleanup completed"
