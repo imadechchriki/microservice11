@@ -132,7 +132,7 @@ jobs:
       - name: ✅ Validate docker-compose configuration
         run: |
           echo "🔍 Validation de la configuration docker-compose..."
-          docker-compose config --quiet
+          docker compose config --quiet
           echo "✅ Configuration docker-compose validée!"
 
       - name: 🔍 Check image availability
@@ -178,14 +178,14 @@ jobs:
         run: |
           echo "🚀 Démarrage des services pour les tests..."
           # Démarrer uniquement les services essentiels pour les tests
-          docker-compose up -d zookeeper kafka auth-postgres catalog-postgres questionnaire-postgres
+          docker compose up -d zookeeper kafka auth-postgres catalog-postgres questionnaire-postgres
           
           # Attendre que les services soient prêts
           echo "⏳ Attente que les services soient prêts..."
           sleep 30
           
           # Démarrer les microservices
-          docker-compose up -d auth-service catalog-service questionnaire-service statistics-service api-gateway
+          docker compose up -d auth-service catalog-service questionnaire-service statistics-service api-gateway
           
           # Attendre que tous les services soient opérationnels
           echo "⏳ Attente que tous les services soient opérationnels..."
@@ -233,7 +233,7 @@ jobs:
         if: always()
         run: |
           echo "🧹 Nettoyage..."
-          docker-compose down -v
+          docker compose down -v
           docker system prune -f
 
   # Job 4: Notification de succès
