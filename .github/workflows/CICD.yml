@@ -13,7 +13,7 @@ permissions:
 env:
   REGISTRY: docker.io
   IMAGE_OWNER: ${{ secrets.DOCKERHUB_USERNAME }}
-  IMAGE_PREFIX: cicdpart1
+  IMAGE_PREFIX: microservice11
   SHA_TAG: ${{ github.sha }}
 
 jobs:
