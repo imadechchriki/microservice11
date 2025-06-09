@@ -177,19 +177,48 @@ jobs:
       - name: 🚀 Start services for testing
         run: |
           echo "🚀 Démarrage des services pour les tests..."
-          # Démarrer uniquement les services essentiels pour les tests
+          
+          # Installer curl pour les health checks
+          sudo apt-get update && sudo apt-get install -y curl
+          
+          # Démarrer d'abord les services d'infrastructure
           docker compose up -d zookeeper kafka auth-postgres catalog-postgres questionnaire-postgres
           
-          # Attendre que les services soient prêts
-          echo "⏳ Attente que les services soient prêts..."
+          # Attendre que les services d'infrastructure soient prêts
+          echo "⏳ Attente que les services d'infrastructure soient prêts..."
+          sleep 45
+          
+          # Vérifier que Kafka est prêt
+          echo "🔍 Vérification de Kafka..."
+          timeout 60s bash -c 'until docker exec kafka kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1; do echo "Attente de Kafka..."; sleep 5; done'
+          
+          # Démarrer les microservices un par un avec des délais
+          echo "🚀 Démarrage d'auth-service..."
+          docker compose up -d auth-service
           sleep 30
           
-          # Démarrer les microservices
-          docker compose up -d auth-service catalog-service questionnaire-service statistics-service api-gateway
+          echo "🚀 Démarrage de catalog-service..."
+          docker compose up -d catalog-service
+          sleep 20
           
-          # Attendre que tous les services soient opérationnels
-          echo "⏳ Attente que tous les services soient opérationnels..."
-          sleep 60
+          echo "🚀 Démarrage de questionnaire-service..."
+          docker compose up -d questionnaire-service
+          sleep 20
+          
+          echo "🚀 Démarrage de statistics-service..."
+          docker compose up -d statistics-service
+          sleep 20
+          
+          echo "🚀 Démarrage d'api-gateway..."
+          docker compose up -d api-gateway
+          sleep 30
+          
+          # Afficher les logs pour diagnostic
+          echo "📋 Status des containers:"
+          docker compose ps
+          
+          echo "📋 Logs d'api-gateway:"
+          docker compose logs --tail=20 api-gateway
 
       - name: 🧪 Run health checks
         run: |
@@ -200,40 +229,73 @@ jobs:
             local service_name=$1
             local port=$2
             local endpoint=${3:-"/health"}
-            local max_attempts=10
+            local max_attempts=15
             local attempt=1
             
-            echo "Vérification de la santé de $service_name..."
+            echo "Vérification de la santé de $service_name sur le port $port..."
             
             while [ $attempt -le $max_attempts ]; do
-              if curl -f -s "http://localhost:$port$endpoint" > /dev/null 2>&1; then
-                echo "✅ $service_name est opérationnel"
-                return 0
+              echo "⏳ Tentative $attempt/$max_attempts pour $service_name..."
+              
+              # Vérifier d'abord si le port est ouvert
+              if nc -z localhost $port 2>/dev/null; then
+                echo "✅ Port $port ouvert pour $service_name"
+                
+                # Ensuite vérifier l'endpoint de santé
+                if curl -f -s --max-time 10 "http://localhost:$port$endpoint" > /dev/null 2>&1; then
+                  echo "✅ $service_name est opérationnel"
+                  return 0
+                else
+                  echo "⚠️ Port ouvert mais endpoint de santé non accessible pour $service_name"
+                fi
+              else
+                echo "⚠️ Port $port fermé pour $service_name"
               fi
               
-              echo "⏳ Tentative $attempt/$max_attempts pour $service_name..."
-              sleep 10
+              sleep 15
               attempt=$((attempt + 1))
             done
             
             echo "❌ $service_name n'est pas opérationnel après $max_attempts tentatives"
+            
+            # Afficher les logs pour diagnostic
+            echo "📋 Logs de $service_name:"
+            docker compose logs --tail=30 $(echo $service_name | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g')
+            
             return 1
           }
           
-          # Vérifier tous les services
-          check_health "API Gateway" 5000 "/health" || exit 1
+          # Installer netcat pour les vérifications de port
+          sudo apt-get install -y netcat-traditional
+          
+          # Vérifier tous les services dans l'ordre de dépendance
+          # Note: Les ports correspondent maintenant à votre docker-compose.yml
           check_health "Auth Service" 5001 "/health" || exit 1
           check_health "Catalog Service" 5003 "/health" || exit 1
           check_health "Questionnaire Service" 5004 "/health" || exit 1
           check_health "Statistics Service" 5005 "/health" || exit 1
+          check_health "API Gateway" 5000 "/health" || exit 1
           
           echo "🎉 Tous les services sont opérationnels!"
+
+      - name: 🧪 Run basic API tests
+        run: |
+          echo "🧪 Tests basiques des APIs..."
+          
+          # Test simple de l'API Gateway
+          echo "Testing API Gateway basic connectivity..."
+          curl -f -s --max-time 10 "http://localhost:5000/health" || {
+            echo "❌ API Gateway health check failed"
+            exit 1
+          }
+          
+          echo "✅ Tests basiques passés!"
 
       - name: 🧹 Cleanup
         if: always()
         run: |
           echo "🧹 Nettoyage..."
-          docker compose down -v
+          docker compose down -v --remove-orphans
           docker system prune -f
 
   # Job 4: Notification de succès
@@ -268,5 +330,6 @@ jobs:
         continue-on-error: true
         run: |
           echo "🧹 Nettoyage des images en cas d'échec..."
-          # Ici vous pourriez ajouter une logique pour supprimer les images partiellement poussées
-          # En fonction de votre stratégie de gestion des échecs
+          # Nettoyer les containers et images
+          docker system prune -f --volumes
+          echo "✅ Nettoyage terminé"
